@@ -1,0 +1,41 @@
+{
+  "name": "prepare-machine-thingy-deployment",
+  "version": "0.1.0",
+  "description": "Small cli to prepare deployments on a server machine. Webhooks and deployment keys for github.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Git",
+    "github",
+    "CLI",
+    "thingy",
+    "machine",
+    "config",
+    "configuration",
+    "deployment"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JhonnyJason/prepare-machine-thingy-deployment.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JhonnyJason/prepare-machine-thingy-deployment/issues"
+  },
+  "homepage": "https://github.com/JhonnyJason/prepare-machine-thingy-deployment#readme",
+  "author": "Lenard Frommelt lenard.frommelt@gne.or.at",
+  "license": "Unlicense",
+  "bin": {
+    "prepare-machine-thingy-deployment": "./index.js"
+  },
+  "dependencies": {
+    "chalk": "^2.4.2",
+    "clui": "^0.3.6",
+    "fs-extra": "^8.1.0",
+    "github-api": "^3.2.2",
+    "inquirer": "^5.2.0",
+    "meow": "^5.0.0",
+    "ssh-keygen": "^0.4.2"
+  }
+}
