@@ -1,13 +1,9 @@
 Modules =
     cliargumentsmodule: require "./cliargumentsmodule"
-    configmodule: require "./configmodule"
-    deploymenthandlermodule: require "./deploymenthandlermodule"
     debugmodule: require "./debugmodule"
-    githubhandlermodule: require "./githubhandlermodule"
-    keymodule: require "./keymodule"
-    pathhandlermodule: require "./pathhandlermodule"
-    prepareprocessmodule: require "./prepareprocessmodule"
+    genconfigprocessmodule: require "./genconfigprocessmodule"
+    nginxconfigmodule: require "./nginxconfigmodule"
     startupmodule: require "./startupmodule"
-    utilmodule: require "./utilmodule"
+    pathhandlermodule: require "./pathhandlermodule"
 
 module.exports = Modules

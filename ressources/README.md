@@ -1,59 +1,53 @@
-# prepare-machine-thingy-deployment - Small cli to prepare deployments on a server machine. Webhooks and deployment keys for github.
+# generate-nginx-config-for-thingies - Small cli which generates the appropriate nginx configuration files which will then later reside in /etc/nginx/sites-enabled directory.
 
 # Why?
 The toolset for the machine thingy requires such a tool.
 
 # What?
-prepare-machine-thingy-deployment - specificly for a machine config thingy, it consists of a set of thingies which are to be deployed on the certain machine. For the deployment to be ready to go we need to set up the webhooks and deployment keys for each of the those thingies for which the machine thingy is configured for.
+generate-nginx-config-for-thingies - which generates the appropriate nginx configuration files which will then later reside in /etc/nginx/sites-enabled directory. 
+
+Made for the machine thingy toolset to have the appropriate nginx configuration files available.  
 
 # How?
 Requirements
 ------------
-* [GitHub account](https://github.com/)
-* [openssh installed](https://www.openssh.com/)
-* [Node.js installed](https://nodejs.org/)
+* [Node.js installed](https://nodejs.org/) ^^nona
 
 Installation
 ------------
 
 Current git version
 ``` sh
-$ npm install git+https://github.com/JhonnyJason/prepare-machine-thingy-deployment-output.git
+$ npm install git+https://github.com/JhonnyJason/generate-nginx-config-for-thingies-output.git
 ```
 Npm Registry
 ``` sh
-$ npm install prepare-machine-thingy-deployment
+$ npm install generate-nginx-config-for-thingies
 ```
-
 
 Usage
 -----
-
-Small cli to prepare deployments on a server machine. Webhooks and deployment keys for github.
+Just call the script and prive an first argument being the path to the machine-config.js file.
+The second argument would be the directory where we should store the generated files.
 
 ```
-$ prepare-machine-thingy-deployment --help
+$ generate-nginx-config-for-thingies --help
 
   Usage
-      $ prepare-machine-thingy-deployment <arg1> <arg2> <arg3>
+      $ generate-nginx-config-for-thingies <arg1> <arg2>
     
   Options
       required:
-      arg1, --keys-directory <path/to/keys>, -k <path/to/keys>
-          path of directory where old keys are kept and the new ones will be stored
-      arg2, --machine-config <machine-config>, -c <machine-config>
+      arg1, --machine-config <machine-config>, -c <machine-config>
           path to file which if the machine-config
+      arg2, --output-directory <path/to/dir>, -o <path/to/dir>
+          path of directory where the generated config files should be stored
     
-      optional:
-      arg3, --mode <mode>, -m <mode>  
-          "prepare" (default) - we keep old keys and add the missing ones - same holds for the webhooks
-          "refresh" - we remove all old keys and webhooks and add new ones
-          "remove" - well... aaaand it's gone, it's all gone!
   TO NOTE:
       The flags will overwrite the flagless argument.
 
   Examples
-      $ prepare-machine-thingy-deployment keys allRepos refresh
+      $ generate-nginx-config-for-thingies  machine-config.js ../sites-enabled
       ...
 
 ```
@@ -61,44 +55,93 @@ $ prepare-machine-thingy-deployment --help
 machine-config
 -----
 
-To be interpreted correctly the machine-config file must meet following requirements.
+To be interpreted correctly the machine-config file must meet following requirements:
 
-It must export an object as follows:
+- hold an array `thingies`
+- each thingy may have:
+    - `homeUser` - required - used for naming
+    - `type` - processed are "service" or "website"
+    - `dnsNames` - optional - sometimes very reasonable^^
+    - `socket` - optional - use proxy_pass to unix-socket
+    - `outsidePort` - nginx listens on this port then default is port 80
+    - `port` - optional(required if we donot use a unix-socket) - proxy_pass to localhost:port
+
 ```javascript
 module.exports = {
-    ipAddress = "7.4.7.6",
-    name = "exampleMachineName",
-    webhookSecret = "supersecretsecret",
-    webhookPort = 4567,
-    thingies = [...]
-}
-```
-Furtherly For each thingy to deploy we have an object in the array.
-While the detailed specification what you need in your machine-config might vary strongly it is required to contain the repository name of the deployable thingy part. Plus for now - it has to be owned by your user on github.
-```javascript
-{
-    repository: "example-machine-1-output",
+    thingies = [
+        {
+            homeUser: "citysearch-socket",
+            type:"service",
+            socket: true,
+            dnsNames: ["citysearch.weblenny.at"],
+            outsidePort: 65531
+        },
+        {
+            homeUser: "weblenny-homepage",
+            type:"website",
+            dnsNames: ["www.weblenny.at", "weblenny.at"]
+        },
+        {
+            homeUser: "citysearch",
+            type:"service",
+            port: "3002",
+            dnsNames: ["citysearch.weblenny.at"]
+        },
+        ...
+    ]
     ...
 }
 ```
 
+
 Result
 -----
-This will produce an active webhook of type `application/json` to `http://7.4.7.6:4567/webhook` which is triggered on `push` events.
+Produced Config Files:
+- File: citysearch-socket
+```
+server {
+    listen 65531;
 
-Also it will create new ssh-keys in OpenSSH format [RFC 4253](https://tools.ietf.org/html/rfc4253#section-6.6) (actually uses openssh over the node-keygen package). The key pairs will be stored in the given `keysDirectory` and the public key will be added as `read_only` deploy key. The title of the deploy key is the used `name` property of the machine-config object.
+    server_name citysearch.weblenny.at;
 
-Notice: It is thought to have 1 deployment for one repository on a certain machine. Thus the deploy keys are identifiable by their titles. Donot use a machine name multiple times!
+    location / {
+        proxy_pass http://unix:/run/citysearch-socket.sk;
+    }
 
-# Further steps
-This tool will be furtherly extended, mainly to fit my own needs.
-Ideas of what could come next:
+}
+```
 
-- add meaningful diagnosis on errors (404 etc.)
-- add support for not-github systems
+- File: weblenny-homepage
+```
+server {
+    listen 80;
+    listen [::]:80;
 
-All sorts of inputs are welcome, thanks!
+    server_name www.weblenny.at weblenny.at;
 
+    location / {
+        root /srv/http/weblenny-homepage;
+        index index.html;
+    }
+
+}
+```
+
+- File: citysearch
+```
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name citysearch.weblenny.at;
+
+    location / {
+        proxy_pass http://localhost:3002;
+    }
+
+}
+```
+- and the others^^
 ---
 
 # License

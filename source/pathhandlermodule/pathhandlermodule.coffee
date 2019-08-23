@@ -1,10 +1,7 @@
 pathhandlermodule = {name: "pathhandlermodule"}
 
 #region node_modules
-inquirer    = require("inquirer")
 c           = require('chalk');
-CLI         = require('clui');
-Spinner     = CLI.Spinner;
 fs          = require("fs-extra")
 pathModule  = require("path")
 #endregion
@@ -14,15 +11,10 @@ log = (arg) ->
     if allModules.debugmodule.modulesToDebug["pathhandlermodule"]?  then console.log "[pathhandlermodule]: " + arg
     return
 
-#region internal variables
-utl = null
-#endregion
-
 #region exposed variables
-pathhandlermodule.keysDirectory = ""
 pathhandlermodule.configPath = ""
+pathhandlermodule.outputDir = ""
 #endregion
-
 
 ##initialization function  -> is automatically being called!  ONLY RELY ON DOM AND VARIABLES!! NO PLUGINS NO OHTER INITIALIZATIONS!!
 pathhandlermodule.initialize = () ->
@@ -40,18 +32,18 @@ checkDirectoryExists = (path) ->
 #endregion
 
 #region exposed functions
-pathhandlermodule.setKeysDirectory = (keysDir) ->
-    if keysDir
-        if pathModule.isAbsolute(keysDir)
-            pathhandlermodule.keysDirectory = keysDir
+pathhandlermodule.setOutputDirectory = (outputDir) ->
+    if outputDir
+        if pathModule.isAbsolute(outputDir)
+            pathhandlermodule.outputDir = outputDir
         else
-            pathhandlermodule.keysDirectory = pathModule.resolve(process.cwd(), keysDir)
+            pathhandlermodule.outputDir = pathModule.resolve(process.cwd(), outputDir)
     else
-        throw "Trying to set undefined or empty directory for the keys."
+        throw "Trying to set undefined or empty directory for the configuration output."
 
-    exists = await checkDirectoryExists(pathhandlermodule.keysDirectory)
+    exists = await checkDirectoryExists(pathhandlermodule.outputDir)
     if !exists
-        throw new Error("Provided directory " + keysDir + " does not exist!")
+        throw new Error("Provided directory " + outputDir + " does not exist!")
 
 pathhandlermodule.setConfigFilePath = (configPath) ->
     if configPath
@@ -60,16 +52,13 @@ pathhandlermodule.setConfigFilePath = (configPath) ->
         else
             pathhandlermodule.configPath = pathModule.resolve(process.cwd(), configPath)
     else
-        throw "Trying to set undefined or empty directory for the keys."
+        throw "Trying to set undefined or empty config path."
 
 pathhandlermodule.getConfigRequirePath = -> pathhandlermodule.configPath
 
-pathhandlermodule.getPrivKeyPath = (repo) ->
-    return pathModule.resolve(pathhandlermodule.keysDirectory, repo)
-
-pathhandlermodule.getPubKeyPath = (repo) ->
-    return pathModule.resolve(pathhandlermodule.keysDirectory, repo + ".pub")
-
+pathhandlermodule.getConfigOutputPath = (name) ->
+    log "pathhandlermodule.getConfigOutputPath"
+    return pathModule.resolve(pathhandlermodule.outputDir, name)
 #endregion
 
 module.exports = pathhandlermodule

@@ -8,14 +8,10 @@ debugmodule.initialize = () ->
 debugmodule.modulesToDebug = 
     unbreaker: true
     # cliargumentsmodule: true
-    # configmodule: true
-    # deploymenthandlermodule: true
-    # githubhandlermodule: true
-    # keymodule: true
+    # genconfigprocessmodule: true
+    # nginxconfigmodule: true
     # pathhandlermodule: true
-    # prepareprocessmodule: true
     # startupmodule: true
-    # utilmodule: true
 
 #region exposed variables
 
