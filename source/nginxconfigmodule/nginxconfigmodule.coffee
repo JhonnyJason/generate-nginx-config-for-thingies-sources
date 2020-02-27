@@ -27,8 +27,10 @@ nginxconfigmodule.initialize = () ->
 listenLine = (thingy) ->
     log "listenLine"
     result = ""
-    if thingy.outsidePort
+    if thingy.outsidePort and thingy.plainHTTP
         result += "    listen " + thingy.outsidePort + ";\n"
+    else if thingy.outsidePort
+        result += "    listen " + (thingy.outsidePort - 1) + ";\n"
     else
         result += "    listen 80;\n"
         result += "    listen [::]:80;\n"
@@ -71,6 +73,8 @@ websiteLocationSection = (thingy) ->
     
     result = "    location / {\n"
     result = noIndexSection(thingy.searchIndexing)
+    result += "        gzip_static on;\n"
+    result += "        limit_except GET { deny all; }\n"
     result += "        root /srv/http/" + thingy.homeUser + ";\n"
     result += "        index index.html;\n"
     result += "\n    }\n\n"
@@ -81,6 +85,7 @@ portServiceLocationSection = (thingy) ->
     if !thingy.port then throw new Error("No port was defined!")
     
     result = "    location / {\n"
+    result += "        limit_except GET POST OPTIONS { deny all; }\n"
     result += noIndexSection(thingy.searchIndexing)
     result += CORSSection(thingy.broadCORS)
     result += websocketSection(thingy.upgradeWebsocket)
@@ -93,6 +98,7 @@ socketServiceLocationSection = (thingy) ->
     if !thingy.homeUser then throw new Error("No homeUser was defined!")
     
     result = "    location / {\n"
+    result += "        limit_except GET POST OPTIONS { deny all; }\n"
     result += noIndexSection(thingy.searchIndexing)
     result += CORSSection(thingy.broadCORS)
     result += websocketSection(thingy.upgradeWebsocket)
@@ -158,6 +164,8 @@ websocketSection = (upgradeWebsocket) ->
             proxy_http_version 1.1;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header Host $host;
+            proxy_read_timeout 2h;
+            proxy_send_timeout 2h;
     
     """
 
