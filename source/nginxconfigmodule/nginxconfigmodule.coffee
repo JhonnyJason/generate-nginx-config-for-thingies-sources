@@ -72,7 +72,7 @@ websiteLocationSection = (thingy) ->
     if !thingy.homeUser then throw new Error("No homeUser was defined!")
     
     result = "    location / {\n"
-    result = noIndexSection(thingy.searchIndexing)
+    result += noIndexSection(thingy.searchIndexing)
     result += "        gzip_static on;\n"
     result += "        limit_except GET { deny all; }\n"
     result += "        root /srv/http/" + thingy.homeUser + ";\n"
