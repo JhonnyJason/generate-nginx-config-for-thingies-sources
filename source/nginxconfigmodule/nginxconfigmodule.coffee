@@ -72,8 +72,9 @@ websiteLocationSection = (thingy) ->
     if !thingy.homeUser then throw new Error("No homeUser was defined!")
     
     result = "    location / {\n"
+    result += removeHTMLExtensionSection()
     result += noIndexSection(thingy.searchIndexing)
-    result += "        gzip_static on;\n"
+    result += "\n        gzip_static on;\n"
     result += "        limit_except GET { deny all; }\n"
     result += "        root /srv/http/" + thingy.homeUser + ";\n"
     result += "        index index.html;\n"
@@ -116,6 +117,18 @@ noIndexSection = (searchIndexing) ->
             add_header  X-Robots-Tag "noindex, nofollow, nosnippet, noarchive";
     
     """ 
+
+removeHTMLExtensionSection = ->
+    return """
+
+    ########## Removing .html extension
+            if ($request_uri ~ ^/(.*)\\.html$) {
+                return 301 /$1;
+            }
+            try_files $uri $uri.html $uri/ =404;
+    
+    """
+
 
 proxyPassPortSection = (port) ->
     return """
