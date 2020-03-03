@@ -29,8 +29,10 @@ listenLine = (thingy) ->
     result = ""
     if thingy.outsidePort and thingy.plainHTTP
         result += "    listen " + thingy.outsidePort + ";\n"
+        result += "    listen [::]:" + thingy.outsidePort + ";\n"
     else if thingy.outsidePort
         result += "    listen " + (thingy.outsidePort - 1) + ";\n"
+        result += "    listen [::]:" + (thingy.outsidePort - 1) + ";\n"
     else
         result += "    listen 80;\n"
         result += "    listen [::]:80;\n"
@@ -43,7 +45,7 @@ serverNameLine = (thingy) ->
     if thingy.dnsNames? && thingy.dnsNames.length > 0
         result += "    server_name"
         result += " " + name for name in thingy.dnsNames
-        result += ";\n\n"
+        result += ";\n"
     return result
 
 locationSection = (thingy) ->
@@ -70,25 +72,30 @@ locationSection = (thingy) ->
 websiteLocationSection = (thingy) ->
     log "websiteLocationSection"
     if !thingy.homeUser then throw new Error("No homeUser was defined!")
-    
-    result = "    location / {\n"
-    result += removeHTMLExtensionSection()
-    result += noIndexSection(thingy.searchIndexing)
-    result += "\n        gzip_static on;\n"
-    result += "        limit_except GET { deny all; }\n"
-    result += "        root /srv/http/" + thingy.homeUser + ";\n"
-    result += "        index index.html;\n"
-    result += "\n    }\n\n"
+
+    result = "\n###### Handling of all regular requests - Website\n"
+
+    # ## location for large media files to be introduced later
+    # result = "    location ~* / {\n"
+    # result += limitExceptSection(thingy.type)
+    # result += "\n        expires 30d;\n" ## move into server block
+    # result += "\n    }\n\n"
+    ## location for rest of the files
+    result += "    location / {\n"
+    result += limitExceptSection(thingy.type)
+    result += "        gzip_static on;\n"
+    result += "        try_files $uri $uri.html $uri/ =404;\n"
+    result += "    }\n\n"
+        
     return result
 
 portServiceLocationSection = (thingy) ->
     log "portServiceLocationSection"
     if !thingy.port then throw new Error("No port was defined!")
-    
-    result = "    location / {\n"
-    result += "        limit_except GET POST OPTIONS { deny all; }\n"
-    result += noIndexSection(thingy.searchIndexing)
-    result += CORSSection(thingy.broadCORS)
+
+    result = "\n###### Handling of all regular requests - PortService\n"
+    result += "    location / {\n"
+    result += limitExceptSection(thingy.type)
     result += websocketSection(thingy.upgradeWebsocket)
     result += proxyPassPortSection(thingy.port)
     result += "\n    }\n\n"
@@ -97,11 +104,10 @@ portServiceLocationSection = (thingy) ->
 socketServiceLocationSection = (thingy) ->
     log "socketServiceLocationSection"
     if !thingy.homeUser then throw new Error("No homeUser was defined!")
-    
-    result = "    location / {\n"
-    result += "        limit_except GET POST OPTIONS { deny all; }\n"
-    result += noIndexSection(thingy.searchIndexing)
-    result += CORSSection(thingy.broadCORS)
+
+    result = "\n###### Handling of all regular requests - SocketService\n"
+    result += "    location / {\n"
+    result += limitExceptSection(thingy.type)
     result += websocketSection(thingy.upgradeWebsocket)
     result += proxyPassSocketSocket(thingy.homeUser)
     result += "\n    }\n\n"
@@ -109,26 +115,64 @@ socketServiceLocationSection = (thingy) ->
 
 ############################################################
 #region individualSections
+htmlForwardSection = (type) ->
+    return "" unless type == "website"
+    return """
+
+    ###### Removing .html extension
+        if ($request_uri ~ ^/(.*)\\.html$) { return 301 /$1; }
+    
+    """
+
+limitExceptSection = (type) ->
+    if type == "website"
+        return "        limit_except GET { deny all; }\n"
+    if type == "service"
+        return "        limit_except POST { deny all; }\n"
+    return ""
+
+rootSection = (thingy) ->
+    return "" unless thingy.type == "website"
+    return """
+    
+    ###### Our document-root
+        root /srv/http/#{thingy.homeUser};
+    
+    """ 
+
 noIndexSection = (searchIndexing) -> 
     if searchIndexing then return ""
     return """
     
-    ########## Tell the Robots: No Indexing!
-            add_header  X-Robots-Tag "noindex, nofollow, nosnippet, noarchive";
+    ###### Tell the Robots: No Indexing!
+        add_header  X-Robots-Tag "noindex, nofollow, nosnippet, noarchive";
     
     """ 
 
-removeHTMLExtensionSection = ->
+CORSSection = (thingy) ->
+    return "" unless thingy.type == "service"
+    return "" unless thingy.broadCORS
     return """
 
-    ########## Removing .html extension
-            if ($request_uri ~ ^/(.*)\\.html$) {
-                return 301 /$1;
-            }
-            try_files $uri $uri.html $uri/ =404;
+    ###### Allow all CORS requests
+        add_header 'Access-Control-Allow-Origin' "$http_origin" always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+        add_header Access-Control-Allow-Headers 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With,X-Token-Auth,X-Mx-ReqToken,X-Requested-With';
+        add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+
+        if ($request_method = 'OPTIONS') { rewrite ^ /.options last; }
+
+    ###### handle options requests here
+        location /.options {
+            limit_except OPTIONS { deny all; }
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain; charset=utf-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
     
     """
-
 
 proxyPassPortSection = (port) ->
     return """
@@ -143,27 +187,6 @@ proxyPassSocketSocket = (homeUser) ->
 
     ########## ProxyPass to service at unix Socket
             proxy_pass http://unix:/run/#{homeUser}.sk;
-    
-    """
-
-CORSSection = (broadCORS) ->
-    return "" unless broadCORS
-    return """
-
-    ########## Allow all CORS requests
-            add_header 'Access-Control-Allow-Origin' "$http_origin" always;
-            add_header 'Access-Control-Allow-Credentials' 'true' always;
-            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
-            add_header Access-Control-Allow-Headers 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With,X-Token-Auth,X-Mx-ReqToken,X-Requested-With';
-            add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
-
-            if ($request_method = 'OPTIONS') {
-
-                add_header 'Access-Control-Max-Age' 1728000;
-                add_header 'Content-Type' 'text/plain; charset=utf-8';
-                add_header 'Content-Length' 0;
-                return 204;
-            }
     
     """
 
@@ -195,6 +218,10 @@ nginxconfigmodule.generateForThingy = (thingy) ->
         configString = "server {\n"
         configString += listenLine(thingy)
         configString += serverNameLine(thingy)
+        configString += rootSection(thingy)
+        configString += noIndexSection(thingy.searchIndexing)
+        configString += CORSSection(thingy)
+        configString += htmlForwardSection(thingy.type)
         configString += locationSection(thingy)
         configString += "}\n"
         configPath = pathHandler.getConfigOutputPath(thingy.homeUser)
